@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>选课时段一览 · 学科专业课</title>
+<style>
+  :root {
+    --bg: #f6f3ee;
+    --ink: #1c1917;
+    --muted: #78716c;
+    --line: #e7e0d6;
+    --panel: #fffdf9;
+    --sel: #0f766e;
+    --sel-bg: #ccfbf1;
+    --base: #b45309;
+    --base-bg: #ffedd5;
+    --major: #1d4ed8;
+    --major-bg: #dbeafe;
+    --elec: #7c3aed;
+    --elec-bg: #ede9fe;
+    --other: #57534e;
+    --other-bg: #e7e5e4;
+    --warn: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", sans-serif;
+    background:
+      radial-gradient(ellipse 80% 50% at 10% -10%, #efe6d8 0%, transparent 55%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, #e8efe9 0%, transparent 50%),
+      var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  header {
+    padding: 28px 32px 12px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  header h1 {
+    font-family: "Fraunces", "Noto Serif SC", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.85rem;
+    margin: 0 0 6px;
+    letter-spacing: -0.02em;
+  }
+  header p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+  .toolbar {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 12px 32px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    align-items: center;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .chip input { accent-color: var(--ink); }
+  .chip.on-selected { border-color: var(--sel); background: var(--sel-bg); }
+  .chip.on-base { border-color: var(--base); background: var(--base-bg); }
+  .chip.on-major { border-color: var(--major); background: var(--major-bg); }
+  .chip.on-elec { border-color: var(--elec); background: var(--elec-bg); }
+  .search {
+    margin-left: auto;
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--panel);
+    min-width: 200px;
+    font: inherit;
+  }
+  .legend {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 32px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .layout {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px 40px;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+  }
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .grid-wrap {
+    overflow: auto;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  table.tt {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    min-width: 860px;
+  }
+  table.tt th, table.tt td {
+    border: 1px solid var(--line);
+    vertical-align: top;
+    padding: 4px;
+  }
+  table.tt thead th {
+    background: #faf7f2;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 10px 6px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  table.tt .period {
+    width: 78px;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+    background: #faf7f2;
+    white-space: nowrap;
+  }
+  table.tt .period strong {
+    display: block;
+    color: var(--ink);
+    font-size: 0.9rem;
+  }
+  table.tt .period {
+    width: 72px;
+  }
+  table.tt .period .band {
+    display: block;
+    font-size: 0.65rem;
+    color: #a8a29e;
+    margin-top: 2px;
+  }
+  table.tt .period .time {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-top: 2px;
+    line-height: 1.2;
+  }
+
+  .slot-cell { min-height: 64px; }
+  .card {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-left: 3px solid var(--other);
+    background: var(--other-bg);
+    padding: 5px 6px;
+    margin: 0 0 4px;
+    border-radius: 0 3px 3px 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.72rem;
+    line-height: 1.25;
+    color: var(--ink);
+  }
+  .card:hover { filter: brightness(0.97); outline: 1px solid #a8a29e; }
+  .card.selected { border-left-color: var(--sel); background: var(--sel-bg); }
+  .card.base { border-left-color: var(--base); background: var(--base-bg); }
+  .card.major { border-left-color: var(--major); background: var(--major-bg); }
+  .card.elec { border-left-color: var(--elec); background: var(--elec-bg); }
+  .card .t { font-weight: 600; }
+  .card .meta { color: var(--muted); }
+  .card .badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 0 4px;
+    border-radius: 2px;
+    background: rgba(0,0,0,0.06);
+    margin-right: 3px;
+  }
+  .card .badge.warn { color: var(--warn); background: #fee2e2; }
+  .side {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+  }
+  .side h2 {
+    margin: 0 0 8px;
+    font-size: 1.05rem;
+    font-family: "Fraunces", "Noto Serif SC", Georgia, serif;
+  }
+  .side .empty { color: var(--muted); font-size: 0.9rem; }
+  .side dl { margin: 0; display: grid; grid-template-columns: 72px 1fr; gap: 6px 8px; font-size: 0.85rem; }
+  .side dt { color: var(--muted); }
+  .side dd { margin: 0; }
+  .side .sched { white-space: pre-wrap; font-size: 0.8rem; line-height: 1.4; }
+  .stats {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 32px 8px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .day-pick {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .day-pick button {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+  }
+  .day-pick button.active {
+    background: var(--ink);
+    color: #fff;
+    border-color: var(--ink);
+  }
+  .list-mode { display: none; }
+  .list-mode.show { display: block; }
+  .list-mode h3 { margin: 16px 0 8px; font-size: 0.95rem; }
+  .list-item {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: var(--panel);
+    cursor: pointer;
+  }
+  .list-item:hover { border-color: #a8a29e; }
+  .list-item .name { font-weight: 600; }
+  .list-item .sub { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+
+  table.tt tr.band-row td {
+    background: #f0ebe3;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-align: left;
+    padding: 6px 10px;
+    border-color: var(--line);
+  }
+
+  .card.starred {
+    box-shadow: inset 0 0 0 1px #c2410c;
+  }
+  .card .star-btn {
+    float: right;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    padding: 0 0 0 4px;
+    color: #d6d3d1;
+  }
+  .card .star-btn.on { color: #c2410c; }
+  .card .star-btn:hover { color: #ea580c; }
+  .mark-bar {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 32px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .mark-bar button {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+  }
+  .mark-bar button:hover { border-color: #a8a29e; }
+  .mark-bar .count {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .side .mark-actions {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0 4px;
+  }
+  .side .mark-actions button {
+    border: 1px solid var(--line);
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+  }
+  .side .mark-actions button.primary {
+    background: #c2410c;
+    color: #fff;
+    border-color: #c2410c;
+  }
+  .side .note-box {
+    margin-top: 12px;
+  }
+  .side .note-box label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .side .note-box textarea {
+    width: 100%;
+    min-height: 72px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 8px;
+    font: inherit;
+    font-size: 0.85rem;
+    resize: vertical;
+    background: #fff;
+  }
+  .side .note-box .hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .marked-list {
+    margin-top: 16px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+  .marked-list h3 {
+    margin: 0 0 8px;
+    font-size: 0.9rem;
+  }
+  .marked-list .item {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.8rem;
+  }
+  .marked-list .item button.link {
+    border: none;
+    background: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    color: var(--ink);
+    flex: 1;
+  }
+  .marked-list .item button.link:hover { text-decoration: underline; }
+  .marked-list .item .rm {
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+  }
+
+</style>
+</head>
+<body>
+<header>
+  <h1>时段听课一览</h1>
+  <p>学科专业课（基础 / 专业 / 选修）+ 已选课程 · 点击格子中的课查看详情 · 同一时段可叠多门候选课</p>
+</header>
+
+<div class="toolbar" id="filters">
+  <label class="chip on-selected"><input type="checkbox" data-f="selected" checked /> 已选</label>
+  <label class="chip on-base"><input type="checkbox" data-f="学位基础课" checked /> 学位基础课</label>
+  <label class="chip on-major"><input type="checkbox" data-f="学位专业课" checked /> 学位专业课</label>
+  <label class="chip on-elec"><input type="checkbox" data-f="专业选修课" checked /> 专业选修课</label>
+  <label class="chip"><input type="checkbox" id="onlyFree" /> 只看未满</label>
+  <label class="chip"><input type="checkbox" id="hideConflict" /> 隐藏冲突标记</label>
+  <input class="search" id="q" placeholder="搜索课程名 / 教师 / 代码" />
+</div>
+
+<div class="legend">
+  <span><i class="swatch" style="background:var(--sel)"></i>已选</span>
+  <span><i class="swatch" style="background:var(--base)"></i>学位基础课</span>
+  <span><i class="swatch" style="background:var(--major)"></i>学位专业课</span>
+  <span><i class="swatch" style="background:var(--elec)"></i>专业选修课</span>
+  <span>红色「冲突」= 与已选时间冲突（系统标记）</span>
+</div>
+
+<div class="mark-bar">
+  <label class="chip"><input type="checkbox" id="onlyStarred" /> 只看已标记</label>
+  <button type="button" id="exportMarks">导出标记 JSON</button>
+  <button type="button" id="clearMarks">清空标记</button>
+  <span class="count" id="markCount"></span>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="layout">
+  <div>
+    <div class="grid-wrap">
+      <table class="tt" id="tt">
+        <thead>
+          <tr>
+            <th style="width:78px">节次</th>
+            <th>周一</th><th>周二</th><th>周三</th><th>周四</th><th>周五</th><th>周六</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="list-mode" id="dayList"></div>
+  </div>
+  <aside class="side" id="detail">
+    <h2>课程详情</h2>
+    <p class="empty">点击课表中的任意一门课</p>
+    <div id="markedList"></div>
+  </aside>
+</div>
+
+<script>
+const DATA = {"meta": {"semester": "2026-2027学年第一学期", "xnxqdm": "20261", "focus": "学科专业课", "source_file": "a.json", "note": "已过滤侧边栏学分汇总、其他可选课噪音；仅保留学位基础课/学位专业课/专业选修课主表 + 已选课程"}, "summary": {"已选": 4, "学位基础课": 1, "学位专业课": 6, "专业选修课": 32, "已选学分": 13.0, "专业选修课未满": 0, "专业选修课有冲突标记": 10}, "courses": [{"code": "GECS40015", "name": "高级汉语（硕士）", "category": "第一外国语课", "kind": "第一外国语课", "teacher": "张豫峰", "campus": "", "department": "011 中国语言文学系", "credits": 4.0, "hours": 72, "full": false, "conflict": false, "multi_group": false, "selected": true, "schedule_raw": "1~16周 星期二 6~9节 HGX507 张豫峰", "slots": [{"day": 2, "periods": [6, 7, 8, 9], "weeks": "1~16周", "room": "HGX507", "raw": "1~16周 星期二 6~9节 HGX507 张豫峰"}], "selected_at": "2026-09-02 11:47:04"}, {"code": "CS60013", "name": "机器学习", "category": "专业选修课", "kind": "专业选修课", "teacher": "池明旻", "campus": "", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": false, "conflict": false, "multi_group": false, "selected": true, "schedule_raw": "1~16周 星期一 3~5节 JA105 池明旻", "slots": [{"day": 1, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JA105", "raw": "1~16周 星期一 3~5节 JA105 池明旻"}], "selected_at": "2026-09-02 10:27:51"}, {"code": "CSEC50007", "name": "图论及其应用", "category": "专业选修课", "kind": "专业选修课", "teacher": "章忠志", "campus": "", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": false, "conflict": false, "multi_group": false, "selected": true, "schedule_raw": "1~16周 星期五 11~13节 JB103 章忠志", "slots": [{"day": 5, "periods": [11, 12, 13], "weeks": "1~16周", "room": "JB103", "raw": "1~16周 星期五 11~13节 JB103 章忠志"}], "selected_at": "2026-09-02 10:08:32"}, {"code": "GESP20001", "name": "中国概况", "category": "政治理论课", "kind": "政治理论课", "teacher": "刘海霞", "campus": "", "department": "080 国际文化交流学院", "credits": 3.0, "hours": 54, "full": false, "conflict": false, "multi_group": false, "selected": true, "schedule_raw": "1~16周 星期五 6~8节 H光华楼东辅楼412 刘海霞", "slots": [{"day": 5, "periods": [6, 7, 8], "weeks": "1~16周", "room": "H光华楼东辅楼412", "raw": "1~16周 星期五 6~8节 H光华楼东辅楼412 刘海霞"}], "selected_at": "2026-09-02 10:04:01"}, {"code": "CSEC60008", "name": "高速计算机网络", "category": "学位基础课", "kind": "学位基础课", "teacher": "刘森", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~3(单),6~7,10,13~15周 星期三 6~8节 JA302 YANGXU（徐扬） | 2~4(双),5,8~9,11~12,16周 星期三 6~8节 JA302 刘森", "slots": [{"day": 3, "periods": [6, 7, 8], "weeks": "1~3(单),6~7,10,13~15周", "room": "JA302", "raw": "1~3(单),6~7,10,13~15周 星期三 6~8节 JA302 YANGXU（徐扬）"}, {"day": 3, "periods": [6, 7, 8], "weeks": "2~4(双),5,8~9,11~12,16周", "room": "JA302", "raw": "2~4(双),5,8~9,11~12,16周 星期三 6~8节 JA302 刘森"}], "selected_at": null}, {"code": "CS50008", "name": "高级软件工程", "category": "学位专业课", "kind": "学位专业课", "teacher": "彭鑫", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": true, "selected": false, "schedule_raw": "1~16周 星期一 11~13节 JB101 彭鑫", "slots": [{"day": 1, "periods": [11, 12, 13], "weeks": "1~16周", "room": "JB101", "raw": "1~16周 星期一 11~13节 JB101 彭鑫"}], "selected_at": null}, {"code": "CS60006", "name": "分布式数据库", "category": "学位专业课", "kind": "学位专业课", "teacher": "卢暾", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": true, "selected": false, "schedule_raw": "1~16周 星期二 11~13节 JA203 卢暾", "slots": [{"day": 2, "periods": [11, 12, 13], "weeks": "1~16周", "room": "JA203", "raw": "1~16周 星期二 11~13节 JA203 卢暾"}], "selected_at": null}, {"code": "CS60017", "name": "网络交易技术前沿", "category": "学位专业课", "kind": "学位专业课", "teacher": "李银胜", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": true, "multi_group": true, "selected": false, "schedule_raw": "1~16周 星期一 3~5节 JB308 李银胜", "slots": [{"day": 1, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JB308", "raw": "1~16周 星期一 3~5节 JB308 李银胜"}], "selected_at": null}, {"code": "CS60027", "name": "程序分析", "category": "学位专业课", "kind": "学位专业课", "teacher": "李弋", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": true, "selected": false, "schedule_raw": "1~16周 星期三 11~13节 JB103 李弋", "slots": [{"day": 3, "periods": [11, 12, 13], "weeks": "1~16周", "room": "JB103", "raw": "1~16周 星期三 11~13节 JB103 李弋"}], "selected_at": null}, {"code": "CS70011", "name": "生物信息学", "category": "学位专业课", "kind": "学位专业课", "teacher": "王飞", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": true, "selected": false, "schedule_raw": "1~16周 星期五 3~5节 JB301 王飞", "slots": [{"day": 5, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JB301", "raw": "1~16周 星期五 3~5节 JB301 王飞"}], "selected_at": null}, {"code": "CSEC50009", "name": "前沿网络技术", "category": "学位专业课", "kind": "学位专业课", "teacher": "吴杰", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": true, "selected": false, "schedule_raw": "1~16周 星期二 3~5节 JB201 吴杰", "slots": [{"day": 2, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JB201", "raw": "1~16周 星期二 3~5节 JB201 吴杰"}], "selected_at": null}, {"code": "AIE831001", "name": "人工智能安全", "category": "专业选修课", "kind": "专业选修课", "teacher": "钱振兴", "campus": "邯郸校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期一 8~10节 HGX407 钱振兴", "slots": [{"day": 1, "periods": [8, 9, 10], "weeks": "1~16周", "room": "HGX407", "raw": "1~16周 星期一 8~10节 HGX407 钱振兴"}], "selected_at": null}, {"code": "AIT531020", "name": "AI考古", "category": "专业选修课", "kind": "专业选修课", "teacher": "钱振兴", "campus": "邯郸校区", "department": "054 文物与博物馆学系", "credits": 2.0, "hours": 36, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "1,8-16周 星期五[8-9节] H复旦源A楼316 | 2-7周 星期五[8-9节] H复旦源A楼316", "slots": [{"day": 5, "periods": [8, 9], "weeks": "1,8-16周", "room": "H复旦源A楼316", "raw": "1,8-16周 星期五[8-9节] H复旦源A楼316"}, {"day": 5, "periods": [8, 9], "weeks": "2-7周", "room": "H复旦源A楼316", "raw": "2-7周 星期五[8-9节] H复旦源A楼316"}], "selected_at": null}, {"code": "CS50002", "name": "计算思维与算法实践", "category": "专业选修课", "kind": "专业选修课", "teacher": "吴永辉", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期一 1~3节 JA303 吴永辉", "slots": [{"day": 1, "periods": [1, 2, 3], "weeks": "1~16周", "room": "JA303", "raw": "1~16周 星期一 1~3节 JA303 吴永辉"}], "selected_at": null}, {"code": "CS50007", "name": "高级网络", "category": "专业选修课", "kind": "专业选修课", "teacher": "赵进", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "1-8周 星期一[3-5节] JB201 | 9-16周 星期一[3-5节] JB201", "slots": [{"day": 1, "periods": [3, 4, 5], "weeks": "1-8周", "room": "JB201", "raw": "1-8周 星期一[3-5节] JB201"}, {"day": 1, "periods": [3, 4, 5], "weeks": "9-16周", "room": "JB201", "raw": "9-16周 星期一[3-5节] JB201"}], "selected_at": null}, {"code": "CS50014", "name": "GPU程序设计", "category": "专业选修课", "kind": "专业选修课", "teacher": "周雅倩", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期五 3~5节 JB102 周雅倩", "slots": [{"day": 5, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JB102", "raw": "1~16周 星期五 3~5节 JB102 周雅倩"}], "selected_at": null}, {"code": "CS50034", "name": "算法续论", "category": "专业选修课", "kind": "专业选修课", "teacher": "赵运磊", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期四 8~10节 JB106 赵运磊", "slots": [{"day": 4, "periods": [8, 9, 10], "weeks": "1~16周", "room": "JB106", "raw": "1~16周 星期四 8~10节 JB106 赵运磊"}], "selected_at": null}, {"code": "CS60007", "name": "数字视频处理", "category": "专业选修课", "kind": "专业选修课", "teacher": "冯瑞", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期五 11~13节 JB102 冯瑞", "slots": [{"day": 5, "periods": [11, 12, 13], "weeks": "1~16周", "room": "JB102", "raw": "1~16周 星期五 11~13节 JB102 冯瑞"}], "selected_at": null}, {"code": "CS60009", "name": "智能信息处理的统计方法", "category": "专业选修课", "kind": "专业选修课", "teacher": "路红", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期四 8~10节 JA205 路红", "slots": [{"day": 4, "periods": [8, 9, 10], "weeks": "1~16周", "room": "JA205", "raw": "1~16周 星期四 8~10节 JA205 路红"}], "selected_at": null}, {"code": "CS60011", "name": "数据安全与治理", "category": "专业选修课", "kind": "专业选修课", "teacher": "韩伟力", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期二 11~13节 JA304 韩伟力", "slots": [{"day": 2, "periods": [11, 12, 13], "weeks": "1~16周", "room": "JA304", "raw": "1~16周 星期二 11~13节 JA304 韩伟力"}], "selected_at": null}, {"code": "CS60012", "name": "多模态认知智能", "category": "专业选修课", "kind": "专业选修课", "teacher": "王智慧", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 2.0, "hours": 36, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期二 4~5节 JA101 王智慧", "slots": [{"day": 2, "periods": [4, 5], "weeks": "1~16周", "room": "JA101", "raw": "1~16周 星期二 4~5节 JA101 王智慧"}], "selected_at": null}, {"code": "CS60014", "name": "生成模型基础与应用", "category": "专业选修课", "kind": "专业选修课", "teacher": "周水庚", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期五 3~5节 JB106 周水庚", "slots": [{"day": 5, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JB106", "raw": "1~16周 星期五 3~5节 JB106 周水庚"}], "selected_at": null}, {"code": "CS60028", "name": "大数据智能", "category": "专业选修课", "kind": "专业选修课", "teacher": "杨夙", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期一 3~5节 JB307 杨夙", "slots": [{"day": 1, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JB307", "raw": "1~16周 星期一 3~5节 JB307 杨夙"}], "selected_at": null}, {"code": "CS60030", "name": "大数据管理技术与系统", "category": "专业选修课", "kind": "专业选修课", "teacher": "王鹏", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期三 1~3节 JA305 王鹏", "slots": [{"day": 3, "periods": [1, 2, 3], "weeks": "1~16周", "room": "JA305", "raw": "1~16周 星期三 1~3节 JA305 王鹏"}], "selected_at": null}, {"code": "CS70008", "name": "计算机视觉", "category": "专业选修课", "kind": "专业选修课", "teacher": "马晨曦", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期五 3~5节 JB302 马晨曦", "slots": [{"day": 5, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JB302", "raw": "1~16周 星期五 3~5节 JB302 马晨曦"}], "selected_at": null}, {"code": "CS70010", "name": "大数据挖掘", "category": "专业选修课", "kind": "专业选修课", "teacher": "熊贇", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期五 3~5节 JA305 熊贇", "slots": [{"day": 5, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JA305", "raw": "1~16周 星期五 3~5节 JA305 熊贇"}], "selected_at": null}, {"code": "CS70020", "name": "金融科技与人工智能", "category": "专业选修课", "kind": "专业选修课", "teacher": "叶广楠", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期四 8~10节 JB201 叶广楠", "slots": [{"day": 4, "periods": [8, 9, 10], "weeks": "1~16周", "room": "JB201", "raw": "1~16周 星期四 8~10节 JB201 叶广楠"}], "selected_at": null}, {"code": "CS70026", "name": "互联网应用技术", "category": "专业选修课", "kind": "专业选修课", "teacher": "赵进", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期一 6~8节 JB100 赵进", "slots": [{"day": 1, "periods": [6, 7, 8], "weeks": "1~16周", "room": "JB100", "raw": "1~16周 星期一 6~8节 JB100 赵进"}], "selected_at": null}, {"code": "CS70037", "name": "高级大数据系统", "category": "专业选修课", "kind": "专业选修课", "teacher": "张为华", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期二 6~8节 JA206 张为华", "slots": [{"day": 2, "periods": [6, 7, 8], "weeks": "1~16周", "room": "JA206", "raw": "1~16周 星期二 6~8节 JA206 张为华"}], "selected_at": null}, {"code": "CS70039", "name": "可重构计算", "category": "专业选修课", "kind": "专业选修课", "teacher": "曹伟", "campus": "邯郸校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期一 3~5节 H2110 曹伟", "slots": [{"day": 1, "periods": [3, 4, 5], "weeks": "1~16周", "room": "H2110", "raw": "1~16周 星期一 3~5节 H2110 曹伟"}], "selected_at": null}, {"code": "CSEC50011", "name": "系统安全", "category": "专业选修课", "kind": "专业选修课", "teacher": "张晓寒", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1-3,12-16周 星期二[3-5节] JA102 | 4-11周 星期二[3-5节] JA102", "slots": [{"day": 2, "periods": [3, 4, 5], "weeks": "1-3,12-16周", "room": "JA102", "raw": "1-3,12-16周 星期二[3-5节] JA102"}, {"day": 2, "periods": [3, 4, 5], "weeks": "4-11周", "room": "JA102", "raw": "4-11周 星期二[3-5节] JA102"}], "selected_at": null}, {"code": "CSEC60006", "name": "生物特征识别与安全", "category": "专业选修课", "kind": "专业选修课", "teacher": "李晟", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期二 1~3节 JA104 李晟", "slots": [{"day": 2, "periods": [1, 2, 3], "weeks": "1~16周", "room": "JA104", "raw": "1~16周 星期二 1~3节 JA104 李晟"}], "selected_at": null}, {"code": "CSEC60007", "name": "信息隐藏", "category": "专业选修课", "kind": "专业选修课", "teacher": "李晟", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "9-16周 星期二[6-8节] JA104 | 1-8周 星期二[6-8节] JA104", "slots": [{"day": 2, "periods": [6, 7, 8], "weeks": "9-16周", "room": "JA104", "raw": "9-16周 星期二[6-8节] JA104"}, {"day": 2, "periods": [6, 7, 8], "weeks": "1-8周", "room": "JA104", "raw": "1-8周 星期二[6-8节] JA104"}], "selected_at": null}, {"code": "CSEC60009", "name": "大数据安全引论", "category": "专业选修课", "kind": "专业选修课", "teacher": "曾剑平", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期一 6~8节 JA203 曾剑平", "slots": [{"day": 1, "periods": [6, 7, 8], "weeks": "1~16周", "room": "JA203", "raw": "1~16周 星期一 6~8节 JA203 曾剑平"}], "selected_at": null}, {"code": "CSEC60013", "name": "有限域理论及应用选讲", "category": "专业选修课", "kind": "专业选修课", "teacher": "金玲飞", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期五 3~5节 JB307 金玲飞", "slots": [{"day": 5, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JB307", "raw": "1~16周 星期五 3~5节 JB307 金玲飞"}], "selected_at": null}, {"code": "CSEC60020", "name": "密码学进阶", "category": "专业选修课", "kind": "专业选修课", "teacher": "赵运磊", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期四 11~13节 JA104 赵运磊", "slots": [{"day": 4, "periods": [11, 12, 13], "weeks": "1~16周", "room": "JA104", "raw": "1~16周 星期四 11~13节 JA104 赵运磊"}], "selected_at": null}, {"code": "EIE50009", "name": "高级软件开发技术", "category": "专业选修课", "kind": "专业选修课", "teacher": "张天戈", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 2.0, "hours": 36, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期五 11~12节 JB101 张天戈", "slots": [{"day": 5, "periods": [11, 12], "weeks": "1~16周", "room": "JB101", "raw": "1~16周 星期五 11~12节 JB101 张天戈"}], "selected_at": null}, {"code": "EIE50010", "name": "数据库系统管理与调优", "category": "专业选修课", "kind": "专业选修课", "teacher": "何震瀛", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 2.0, "hours": 36, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1-8周 星期五[1-2节] JA105 | 9-16周 星期五[1-2节] JA105", "slots": [{"day": 5, "periods": [1, 2], "weeks": "1-8周", "room": "JA105", "raw": "1-8周 星期五[1-2节] JA105"}, {"day": 5, "periods": [1, 2], "weeks": "9-16周", "room": "JA105", "raw": "9-16周 星期五[1-2节] JA105"}], "selected_at": null}, {"code": "EIE50018", "name": "现代web开发", "category": "专业选修课", "kind": "专业选修课", "teacher": "朱东来", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": true, "multi_group": false, "selected": false, "schedule_raw": "3周 星期二[6-8节] JA101 | 9-10,13-16周 星期二[6-8节] JA101 | 2,7周 星期二[6-8节] JA101 | 8周 星期二[6-8节] JA101 | 1,4-6,11-12周 星期二[6-8节] JA101", "slots": [{"day": 2, "periods": [6, 7, 8], "weeks": "3周", "room": "JA101", "raw": "3周 星期二[6-8节] JA101"}, {"day": 2, "periods": [6, 7, 8], "weeks": "9-10,13-16周", "room": "JA101", "raw": "9-10,13-16周 星期二[6-8节] JA101"}, {"day": 2, "periods": [6, 7, 8], "weeks": "2,7周", "room": "JA101", "raw": "2,7周 星期二[6-8节] JA101"}, {"day": 2, "periods": [6, 7, 8], "weeks": "8周", "room": "JA101", "raw": "8周 星期二[6-8节] JA101"}, {"day": 2, "periods": [6, 7, 8], "weeks": "1,4-6,11-12周", "room": "JA101", "raw": "1,4-6,11-12周 星期二[6-8节] JA101"}], "selected_at": null}, {"code": "EIE60022", "name": "深度学习应用", "category": "专业选修课", "kind": "专业选修课", "teacher": "赵卫东", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期四 3~5节 JA102 赵卫东", "slots": [{"day": 4, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JA102", "raw": "1~16周 星期四 3~5节 JA102 赵卫东"}], "selected_at": null}, {"code": "EIE60024", "name": "数智实践与系统思维", "category": "专业选修课", "kind": "专业选修课", "teacher": "李银胜", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期三 3~5节 JB302 李银胜", "slots": [{"day": 3, "periods": [3, 4, 5], "weeks": "1~16周", "room": "JB302", "raw": "1~16周 星期三 3~5节 JB302 李银胜"}], "selected_at": null}, {"code": "EIE60025", "name": "安全机器学习", "category": "专业选修课", "kind": "专业选修课", "teacher": "陈平", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 3.0, "hours": 54, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1-4,13-16周 星期二[11-13节] JA104 | 5-12周 星期二[11-13节] JA104", "slots": [{"day": 2, "periods": [11, 12, 13], "weeks": "1-4,13-16周", "room": "JA104", "raw": "1-4,13-16周 星期二[11-13节] JA104"}, {"day": 2, "periods": [11, 12, 13], "weeks": "5-12周", "room": "JA104", "raw": "5-12周 星期二[11-13节] JA104"}], "selected_at": null}, {"code": "EIE60028", "name": "高级信息安全", "category": "专业选修课", "kind": "专业选修课", "teacher": "李景涛", "campus": "江湾校区", "department": "305 计算与智能创新学院", "credits": 2.0, "hours": 36, "full": true, "conflict": false, "multi_group": false, "selected": false, "schedule_raw": "1~16周 星期五 1~2节 JB103 李景涛", "slots": [{"day": 5, "periods": [1, 2], "weeks": "1~16周", "room": "JB103", "raw": "1~16周 星期五 1~2节 JB103 李景涛"}], "selected_at": null}]};
+
+
+const MARK_KEY = 'fdu_course_marks_v1';
+// marks: { [code]: { starred: true, note: '', updatedAt: ISO } }
+
+function loadMarks() {
+  try { return JSON.parse(localStorage.getItem(MARK_KEY) || '{}') || {}; }
+  catch { return {}; }
+}
+function saveMarks(marks) {
+  localStorage.setItem(MARK_KEY, JSON.stringify(marks));
+  updateMarkCount();
+}
+function isStarred(code) {
+  return !!loadMarks()[code]?.starred;
+}
+function getNote(code) {
+  return loadMarks()[code]?.note || '';
+}
+function toggleStar(code, force) {
+  const marks = loadMarks();
+  const cur = marks[code] || { starred: false, note: '' };
+  const next = (force === undefined) ? !cur.starred : !!force;
+  if (!next && !cur.note) {
+    delete marks[code];
+  } else {
+    marks[code] = { ...cur, starred: next, updatedAt: new Date().toISOString() };
+    if (!next && !marks[code].note) delete marks[code];
+  }
+  saveMarks(marks);
+  return next;
+}
+function setNote(code, note) {
+  const marks = loadMarks();
+  const cur = marks[code] || { starred: false, note: '' };
+  const n = note.trim();
+  if (!n && !cur.starred) {
+    delete marks[code];
+  } else {
+    marks[code] = { ...cur, note: n, starred: cur.starred || false, updatedAt: new Date().toISOString() };
+  }
+  saveMarks(marks);
+}
+function updateMarkCount() {
+  const marks = loadMarks();
+  const n = Object.values(marks).filter(m => m.starred).length;
+  const el = document.getElementById('markCount');
+  if (el) el.textContent = n ? `已标记 ${n} 门` : '尚未标记课程';
+  renderMarkedList();
+}
+function courseByCode(code) {
+  return DATA.courses.find(c => c.code === code);
+}
+function renderMarkedList() {
+  const host = document.getElementById('markedList');
+  if (!host) return;
+  const marks = loadMarks();
+  const items = Object.entries(marks).filter(([, m]) => m.starred);
+  if (!items.length) {
+    host.innerHTML = '<div class="marked-list"><h3>我的标记</h3><p class="empty" style="margin:0;font-size:0.85rem;color:var(--muted)">点击课程卡片右上角 ★ 添加</p></div>';
+    return;
+  }
+  host.innerHTML = `<div class="marked-list"><h3>我的标记（${items.length}）</h3>` +
+    items.map(([code, m]) => {
+      const c = courseByCode(code);
+      const title = c ? `${c.name}` : code;
+      const sub = c ? `${code} · ${c.teacher}` : code;
+      const note = m.note ? `<div style="color:var(--muted);margin-top:2px">${esc(m.note)}</div>` : '';
+      return `<div class="item">
+        <button type="button" class="link" data-code="${code}">★ ${esc(title)}<div style="color:var(--muted)">${esc(sub)}</div>${note}</button>
+        <button type="button" class="rm" data-rm="${code}">取消</button>
+      </div>`;
+    }).join('') + '</div>';
+  host.querySelectorAll('button.link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const c = courseByCode(btn.dataset.code);
+      if (c) showDetail(c, c.slots[0] || { room:'', weeks:'' }, c.slots[0]?.day || 1, c.slots[0]?.periods?.[0] || 1);
+    });
+  });
+  host.querySelectorAll('button.rm').forEach(btn => {
+    btn.addEventListener('click', () => {
+      toggleStar(btn.dataset.rm, false);
+      buildGrid();
+      const c = courseByCode(btn.dataset.rm);
+      if (c) showDetail(c, c.slots[0] || { room:'', weeks:'' }, c.slots[0]?.day || 1, c.slots[0]?.periods?.[0] || 1);
+    });
+  });
+}
+
+
+const DAYS = [1,2,3,4,5,6];
+const DAY_NAME = {1:'周一',2:'周二',3:'周三',4:'周四',5:'周五',6:'周六',7:'周日'};
+const PERIOD_RANGE = {
+  1: ['08:00','08:45'], 2: ['08:55','09:40'], 3: ['09:55','10:40'],
+  4: ['10:50','11:35'], 5: ['11:45','12:30'],
+  6: ['13:30','14:15'], 7: ['14:25','15:10'], 8: ['15:25','16:10'],
+  9: ['16:20','17:05'], 10: ['17:15','18:00'],
+  11: ['18:30','19:15'], 12: ['19:25','20:10'], 13: ['20:20','21:05']
+};
+const PERIOD_BAND = {
+  1:'上午',2:'上午',3:'上午',4:'上午',5:'上午',
+  6:'下午',7:'下午',8:'下午',9:'下午',10:'下午',
+  11:'晚上',12:'晚上',13:'晚上'
+};
+
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+function catClass(c) {
+  if (c.selected) return 'selected';
+  if (c.kind === '学位基础课' || c.category === '学位基础课') return 'base';
+  if (c.kind === '学位专业课' || c.category === '学位专业课') return 'major';
+  if (c.kind === '专业选修课' || c.category === '专业选修课') return 'elec';
+  return '';
+}
+
+function kindKey(c) {
+  if (c.selected) return 'selected';
+  return c.kind;
+}
+
+function visibleCourses() {
+  const flags = {};
+  document.querySelectorAll('#filters input[data-f]').forEach(inp => {
+    flags[inp.dataset.f] = inp.checked;
+  });
+  const onlyFree = document.getElementById('onlyFree').checked;
+  const hideConflict = document.getElementById('hideConflict').checked;
+  const onlyStarred = document.getElementById('onlyStarred')?.checked;
+  const q = document.getElementById('q').value.trim().toLowerCase();
+
+  return DATA.courses.filter(c => {
+    if (c.selected) {
+      if (!flags['selected']) return false;
+    } else {
+      if (!flags[c.kind]) return false;
+    }
+    if (onlyStarred && !isStarred(c.code)) return false;
+    if (onlyFree && c.full) return false;
+    if (hideConflict && c.conflict) return false;
+    if (q) {
+      const hay = `${c.code} ${c.name} ${c.teacher} ${c.campus}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function buildGrid() {
+  const courses = visibleCourses();
+  const bySlot = {}; // day-period -> Map(code -> {course, slot})
+  for (const c of courses) {
+    for (const s of c.slots) {
+      if (!DAYS.includes(s.day)) continue;
+      for (const p of s.periods) {
+        const key = `${s.day}-${p}`;
+        if (!bySlot[key]) bySlot[key] = new Map();
+        // keep first slot meta for this course in cell
+        if (!bySlot[key].has(c.code)) bySlot[key].set(c.code, { course: c, slot: s });
+      }
+    }
+  }
+
+  const tbody = document.querySelector('#tt tbody');
+  tbody.innerHTML = '';
+  let shown = 0;
+  const bandStart = {1:'上午', 6:'下午', 11:'晚上'};
+  for (let p = 1; p <= 13; p++) {
+    if (bandStart[p]) {
+      const br = document.createElement('tr');
+      br.className = 'band-row';
+      const bd = document.createElement('td');
+      bd.colSpan = 7;
+      bd.textContent = bandStart[p];
+      br.appendChild(bd);
+      tbody.appendChild(br);
+    }
+    const tr = document.createElement('tr');
+    const th = document.createElement('td');
+    th.className = 'period';
+    const [ps, pe] = PERIOD_RANGE[p];
+    const band = PERIOD_BAND[p];
+    th.innerHTML = `<strong>${p}</strong><span class="band">${band}</span><span class="time">${ps}<br>–${pe}</span>`;
+    tr.appendChild(th);
+    for (const d of DAYS) {
+      const td = document.createElement('td');
+      td.className = 'slot-cell';
+      const map = bySlot[`${d}-${p}`];
+      if (map) {
+        // sort: selected first, then alpha
+        const items = [...map.values()].sort((a, b) => {
+          if (a.course.selected !== b.course.selected) return a.course.selected ? -1 : 1;
+          return a.course.code.localeCompare(b.course.code);
+        });
+        for (const { course: c, slot: s } of items) {
+          shown++;
+          const btn = document.createElement('button');
+          btn.className = `card ${catClass(c)}`;
+          btn.type = 'button';
+          const badges = [];
+          if (c.selected) badges.push('<span class="badge">已选</span>');
+          if (c.conflict) badges.push('<span class="badge warn">冲突</span>');
+          if (c.full) badges.push('<span class="badge">已满</span>');
+          if (c.multi_group) badges.push('<span class="badge">多选组</span>');
+          const starred = isStarred(c.code);
+          if (starred) {
+            btn.classList.add('starred');
+            badges.push('<span class="badge">★</span>');
+          }
+          btn.innerHTML = `<span class="star-btn ${starred ? 'on' : ''}" data-star="${c.code}" title="标记/取消">★</span>${badges.join('')}<div class="t">${c.name}</div><div class="meta">${c.code} · ${c.teacher}</div>`;
+          btn.addEventListener('click', (e) => {
+            const starEl = e.target.closest('[data-star]');
+            if (starEl) {
+              e.stopPropagation();
+              toggleStar(starEl.dataset.star);
+              buildGrid();
+              showDetail(c, s, d, p);
+              return;
+            }
+            showDetail(c, s, d, p);
+          });
+          td.appendChild(btn);
+        }
+      }
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+
+  const uniq = new Set(courses.map(c => c.code));
+  document.getElementById('stats').textContent =
+    `当前显示 ${uniq.size} 门课 · 课表格子出现 ${shown} 次（跨多节会重复） · 学期 ${DATA.meta.semester}`;
+}
+
+function showDetail(c, slot, day, period) {
+  const el = document.getElementById('detail');
+  const starred = isStarred(c.code);
+  const note = getNote(c.code);
+  const dayLabel = DAY_NAME[day] || '';
+  const periodLabel = period ? `第${period}节` : '';
+  el.innerHTML = `
+    <h2>${esc(c.name)}</h2>
+    <div class="mark-actions">
+      <button type="button" class="primary" id="btnToggleStar">${starred ? '★ 取消标记' : '☆ 标记这门课'}</button>
+    </div>
+    <dl>
+      <dt>代码</dt><dd>${esc(c.code)}</dd>
+      <dt>类别</dt><dd>${esc(c.category)}${c.selected ? ' · 已选' : ''}</dd>
+      <dt>学分</dt><dd>${c.credits ?? '-'}（${c.hours ?? '-'} 学时）</dd>
+      <dt>教师</dt><dd>${esc(c.teacher || '-')}</dd>
+      <dt>院系</dt><dd>${esc(c.department || '-')}</dd>
+      <dt>校区</dt><dd>${esc(c.campus || '-')}</dd>
+      <dt>容量</dt><dd>${c.full ? '已满' : '未满/未知'}</dd>
+      <dt>标记</dt><dd>${[c.conflict?'与已选冲突':'', c.multi_group?'多选组':''].filter(Boolean).join(' · ') || '无'}</dd>
+      <dt>本格</dt><dd>${dayLabel} ${periodLabel} · ${esc(slot?.room || '')} · ${esc(slot?.weeks || '')}</dd>
+      <dt>完整时间</dt><dd class="sched">${esc(c.schedule_raw).replace(/ \| /g, "<br>")}</dd>
+    </dl>
+    <div class="note-box">
+      <label for="courseNote">备注（仅保存在本浏览器）</label>
+      <textarea id="courseNote" placeholder="例如：想听 / 等退课 / 和导师确认…">${esc(note)}</textarea>
+      <div class="hint">失焦自动保存</div>
+    </div>
+    <div id="markedList"></div>
+  `;
+  document.getElementById('btnToggleStar').addEventListener('click', () => {
+    toggleStar(c.code);
+    buildGrid();
+    showDetail(c, slot, day, period);
+  });
+  const ta = document.getElementById('courseNote');
+  ta.addEventListener('change', () => setNote(c.code, ta.value));
+  ta.addEventListener('blur', () => setNote(c.code, ta.value));
+  renderMarkedList();
+}
+
+document.querySelectorAll('#filters input').forEach(inp => {
+  inp.addEventListener('change', buildGrid);
+  inp.addEventListener('input', buildGrid);
+});
+document.getElementById('q').addEventListener('input', buildGrid);
+
+document.getElementById('onlyStarred')?.addEventListener('change', buildGrid);
+document.getElementById('exportMarks')?.addEventListener('click', () => {
+  const marks = loadMarks();
+  const packed = Object.entries(marks).filter(([,m]) => m.starred).map(([code, m]) => {
+    const c = courseByCode(code) || {};
+    return { code, name: c.name, teacher: c.teacher, category: c.category, schedule: c.schedule_raw, note: m.note || '', updatedAt: m.updatedAt };
+  });
+  const blob = new Blob([JSON.stringify(packed, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'course_marks.json';
+  a.click();
+});
+document.getElementById('clearMarks')?.addEventListener('click', () => {
+  if (!confirm('确定清空所有标记和备注？')) return;
+  localStorage.removeItem(MARK_KEY);
+  updateMarkCount();
+  buildGrid();
+  document.getElementById('detail').innerHTML = '<h2>课程详情</h2><p class="empty">点击课表中的任意一门课</p><div id="markedList"></div>';
+  renderMarkedList();
+});
+
+updateMarkCount();
+
+buildGrid();
+</script>
+</body>
+</html>
